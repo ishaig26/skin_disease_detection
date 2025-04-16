@@ -1,0 +1,118 @@
+import pandas as pd
+import numpy as np
+import tensorflow as tf
+from model import build_model
+from dataset import create_dataset
+from sklearn.utils import class_weight
+import os
+
+# Paths
+DATA_DIR = "E:/vs/Skin/data_total/raw/data"
+MODEL_DIR = "E:/vs/Skin/models"
+os.makedirs(MODEL_DIR, exist_ok=True)
+
+# Load CSVs
+train_df = pd.read_csv(f"{DATA_DIR}/train_clean.csv")
+val_df = pd.read_csv(f"{DATA_DIR}/val_clean.csv")
+
+# Compute class weights
+train_labels = train_df['label'].values
+class_weights_array = class_weight.compute_class_weight(
+    class_weight='balanced',
+    classes=np.unique(train_labels),
+    y=train_labels
+)
+class_weights = {i: w for i, w in enumerate(class_weights_array)}
+print("⚖️ Class Weights:", class_weights)
+
+# Create datasets
+train_ds = create_dataset(train_df, augment=True, batch_size=32)
+val_ds = create_dataset(val_df, augment=False, batch_size=32, shuffle=False)
+
+# Build model
+model = build_model(input_shape=(224, 224, 3), num_classes=7)
+
+# ====== Stage 1: Train only top layers ======
+# Freeze the backbone
+for layer in model.layers:
+    layer.trainable = False
+
+# Unfreeze only the classification head
+for layer in model.layers[-5:]:
+    layer.trainable = True
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
+    filepath=os.path.join(MODEL_DIR, "best_model_stage1.keras"),
+    save_best_only=True,
+    monitor="val_accuracy",
+    mode="max",
+    verbose=1
+)
+
+print("\n🚀 Starting Stage 1 Training (Frozen Backbone)...")
+history_stage1 = model.fit(
+    train_ds,
+    validation_data=val_ds,
+    epochs=10,
+    callbacks=[checkpoint_cb],
+    class_weight=class_weights
+)
+
+# ====== Stage 2: Fine-tune entire model ======
+# Unfreeze all layers
+for layer in model.layers:
+    layer.trainable = True
+
+# Re-compile with a lower learning rate
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+checkpoint_cb2 = tf.keras.callbacks.ModelCheckpoint(
+    filepath=os.path.join(MODEL_DIR, "best_model_stage2.keras"),
+    save_best_only=True,
+    monitor="val_accuracy",
+    mode="max",
+    verbose=1
+)
+
+print("\n🔥 Starting Stage 2 Fine-Tuning (All Layers)...")
+history_stage2 = model.fit(
+    train_ds,
+    validation_data=val_ds,
+    epochs=20,
+    callbacks=[checkpoint_cb2],
+    class_weight=class_weights
+)
+
+print("✅ Training complete. Best models saved!")
+
+# === Plot Training History ===
+import matplotlib.pyplot as plt
+
+def plot_history(histories, labels):
+    plt.figure(figsize=(10,5))
+
+    for history, label in zip(histories, labels):
+        plt.plot(history.history['val_accuracy'], label=f'{label} Val Acc')
+        plt.plot(history.history['accuracy'], linestyle='--', label=f'{label} Train Acc')
+
+    plt.title('Training & Validation Accuracy Over Epochs')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+plot_history(
+    [history_stage1, history_stage2],
+    ["Stage 1", "Stage 2"]
+)
