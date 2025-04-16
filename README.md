@@ -4,6 +4,7 @@ An end-to-end deep learning pipeline for detecting skin diseases from dermatosco
 This project uses the HAM10000 dataset, applying modern deep learning practices including data augmentation, class balancing, transfer learning (ResNet), and an interactive Gradio app for predictions.
 
 ## 🗂️ Project Structure
+```bash
 skin_disease_detector/
 ├── app/
 │   ├── app.py               # Gradio-based interactive prediction UI
@@ -21,7 +22,7 @@ skin_disease_detector/
 ├── reclean.py               # Script for re-cleaning / fixing the dataset if needed
 ├── trial.py                 # Quick script to print and inspect DataFrame columns
 └── unzip.py                 # Script to handle zipped datasets locally
-
+```
 
 ---
 
