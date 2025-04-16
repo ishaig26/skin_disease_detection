@@ -19,4 +19,4 @@ gr.Interface(
     outputs="label",
     title="AI-Based Skin Disease Detector",
     description="Upload a skin lesion image and get the predicted disease"
-).launch()
+).launch(server_name="0.0.0.0", server_port=8080)
