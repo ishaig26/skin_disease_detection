@@ -83,7 +83,26 @@ python app/app.py
 ```
 This will launch a web interface where you can upload images and see predictions.
 
-### 4️⃣ Predict with Gradio Web App
+### 5️⃣ Evaluate Using Confusion Matrix
 You can validate your model predictions by using the provided predict.py or your own evaluation script.
 
+### 📦 Model Checkpoints
+Trained models are saved inside:
+```bash
+/models/
+```
+Examples:
+-best_model_stage1.keras
+-best_model_stage2.keras
+Make sure to load the correct stage model during testing or inference.
 
+### ⚠️ Disclaimer
+This project is for educational and research purposes only and is not intended for clinical or diagnostic use.
+
+### 💖 Acknowledgements
+Dataset: HAM10000 Skin Lesion Dataset
+Libraries: TensorFlow, NumPy, OpenCV, Matplotlib, Gradio.
+
+### 📬 Contributions & Feedback
+Contributions, pull requests, and suggestions are always welcome!
+Feel free to fork this repo and submit your ideas.
