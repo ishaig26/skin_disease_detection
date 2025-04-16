@@ -1,0 +1,63 @@
+import tensorflow as tf
+import albumentations as A
+import cv2
+import numpy as np
+
+def create_dataset(df, augment=True, batch_size=32, shuffle=True):
+    base_path = "E:/vs/Skin/data_total/raw"
+    paths = [f"{base_path}/{p}" for p in df['image_path'].values]
+
+    # Automatically encode string labels if needed
+    if isinstance(df['label'].values[0], str):
+        label_to_int = {name: idx for idx, name in enumerate(sorted(df['label'].unique()))}
+        df['label'] = df['label'].map(label_to_int)
+        print(f"✅ Label encoding: {label_to_int}")
+
+    labels = df['label'].values.astype(np.int64)
+
+    # Define Albumentations augmentation pipeline
+    if augment:
+        transform = A.Compose([
+            A.Resize(224, 224),
+            A.HorizontalFlip(p=0.5),
+            A.RandomBrightnessContrast(p=0.2),
+            A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+        ])
+    else:
+        transform = A.Compose([
+            A.Resize(224, 224),
+            A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+        ])
+
+    def load_image(image_path, label):
+        if isinstance(image_path, bytes):
+            image_path = image_path.decode("utf-8")
+        elif isinstance(image_path, tf.Tensor):
+            image_path = image_path.numpy().decode("utf-8")
+
+        image = cv2.imread(image_path)
+        if image is None:
+            print(f"⚠️ Failed to read image: {image_path}")
+            image = np.zeros((224, 224, 3), dtype=np.uint8)
+
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = transform(image=image)['image']
+        return image.astype(np.float32), np.int64(label)
+
+    def _process(path, label):
+        image, label = tf.numpy_function(
+            func=load_image,
+            inp=[path, label],
+            Tout=[tf.float32, tf.int64]
+        )
+        image.set_shape([224, 224, 3])
+        label.set_shape([])
+        return image, label
+
+    dataset = tf.data.Dataset.from_tensor_slices((paths, labels))
+    if shuffle:
+        dataset = dataset.shuffle(buffer_size=len(df))
+    dataset = dataset.map(_process, num_parallel_calls=tf.data.AUTOTUNE)
+    dataset = dataset.batch(batch_size).prefetch(tf.data.AUTOTUNE)
+
+    return dataset
